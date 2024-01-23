@@ -33,8 +33,8 @@ a rpc framework, sendmsg oneway, support both client send and server send
 
 - data帧
 ```
-[Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional]
-
+// msgType全局共享, 1个字节足够表达了256中消息
+[Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
 ```
 
 - windowupdate
