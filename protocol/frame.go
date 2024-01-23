@@ -16,7 +16,11 @@ const (
 type DataFrame struct {
 	Header  []byte
 	Payload []byte
-	Done    chan struct{}
+}
+
+type Stream struct {
+	Size int64
+	Done chan struct{}
 }
 
 func NewDataFrame() DataFrame {
