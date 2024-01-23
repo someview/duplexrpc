@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/cloudwego/netpoll"
-	"github.com/cloudwego/netpoll/mux"
-	"github.com/smallnest/rpcx/protocol"
+	"net"
+	"rpc-oneway/protocol"
 )
 
 var (
@@ -15,10 +15,8 @@ var (
 
 type muxClient struct {
 	// 这是和连接相关的部分
-	closing            bool            // whether the server is going to close this connection
-	netpoll.Connection                 // raw conn
-	shardQueue         *mux.ShardQueue // use for write
-	*WriteQuota
+	closing bool // whether the server is going to close this connection
+	net.Conn
 }
 
 // OnRequest is called when the connection creates.
@@ -27,7 +25,7 @@ func (c *muxClient) OnRequest(ctx context.Context, connection netpoll.Connection
 	return err
 }
 
-func (c *muxClient) handleServerRequest(msg *protocol.Message) {
+func (c *muxClient) handleServerRequest() {
 
 }
 
@@ -41,6 +39,8 @@ func (c *muxClient) Send(ctx context.Context, msgType byte, req any) error {
 	if c.closing {
 		return ErrShutdown
 	}
-	writer := netpoll.NewLinkBuffer()
+}
 
+func (c *muxClient) sendFrame(ctx context.Context, frame protocol.DataFrame) error {
+	c.Conn.Write()
 }
