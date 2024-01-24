@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/netpoll"
 	"net"
 	"rpc-oneway/protocol"
 )
@@ -20,10 +19,6 @@ type muxClient struct {
 }
 
 // OnRequest is called when the connection creates.
-func (c *muxClient) OnRequest(ctx context.Context, connection netpoll.Connection) (err error) {
-	//reader, err := connection.Reader().Slice(length)
-	return err
-}
 
 func (c *muxClient) handleServerRequest() {
 
@@ -31,16 +26,36 @@ func (c *muxClient) handleServerRequest() {
 
 // Send 用户层调用接口
 func (c *muxClient) Send(ctx context.Context, msgType byte, req any) error {
-	//meta := ctx.Value(share.ReqMetaDataKey)
-	//if meta != nil { // copy meta in context to meta in requests
-	//	call.Metadata = meta.(map[string]string)
-	//}
-	// todo 采用writeQuota 判断一下
+	// todo ctx
 	if c.closing {
 		return ErrShutdown
 	}
+	payload, ok := req.(protocol.SizeableMarshaller)
+	if !ok {
+		return ErrUnsupportedCodec
+	}
+
+	msg := protocol.NewMessage()
+	msg.Payload = payload
+	msg.MsgType = msgType
+	allData, err := msg.EncodeSlicePointer()
+	if err != nil {
+		return err
+	}
+
+	// todo 抉择是否需要判断
+	//if ctx.Err() != nil {
+	//	return ctx.Err()
+	//}
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = c.Conn.SetWriteDeadline(deadline)
+	}
+
+	_, err = c.Conn.Write(*allData)
+	protocol.PutData(allData)
+	return err
 }
 
-func (c *muxClient) sendFrame(ctx context.Context, frame protocol.DataFrame) error {
-	c.Conn.Write()
-}
+
+
+func(c *muxClient)

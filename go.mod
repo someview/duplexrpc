@@ -3,7 +3,6 @@ module rpc-oneway
 go 1.21.4
 
 require (
-	github.com/cloudwego/netpoll v0.5.1
 	github.com/smallnest/rpcx v1.8.24
 )
 

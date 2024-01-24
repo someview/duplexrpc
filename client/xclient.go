@@ -68,6 +68,7 @@ func (c *xClient) Send(ctx context.Context, msgType int32, args any) error {
 	// 	m := metadata.(map[string]string)
 	// 	m[share.AuthKey] = c.auth
 	// }
+	// 存在selectClient的过程
 	return nil
 }
 

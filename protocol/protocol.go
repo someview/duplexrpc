@@ -2,11 +2,12 @@ package protocol
 
 import (
 	"encoding/binary"
-	"github.com/smallnest/rpcx/util"
-	"io"
+	"rpc-oneway/util"
 )
 
 type FrameType byte
+
+var bufferPool = util.NewLimitedPool(512, 4096)
 
 const (
 	InitialType     FrameType = iota
@@ -17,83 +18,72 @@ const (
 	CloseType                 = 8
 )
 
-type Message interface {
-	EncodeSlicePointer() *[]byte
-	Reset()
-	io.WriterTo
+// SizeableMarshaller todo 将这里的接口和protobuf解码
+type SizeableMarshaller interface {
+	Size() int
+	MarshalToSizedBuffer([]byte) (int, error)
+	Unmarshal([]byte) error
 }
 
-// DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
+// Message DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
 // 需要有一个控制信号, 用于在检测时，完成这个处理过程
-type DataFrame struct {
+type Message struct {
 	TraceId  []byte
 	SpanId   []byte
 	AltKey   string
-	MetaData map[string]string
-	Payload  []byte
-	msgType  byte
+	Metadata map[string]string
+	Payload  SizeableMarshaller
+	MsgType  byte
 }
 
-type Stream struct {
-	Size int64
-	Done chan struct{}
-}
-
-func NewDataFrame() *DataFrame {
-	return &DataFrame{}
+func NewMessage() *Message {
+	return &Message{}
 }
 
 // EncodeSlicePointer encodes messages as a byte slice pointer we can use pool to improve.
-func (m Message) EncodeSlicePointer() *[]byte {
+// [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
+const (
+	fixedHeaderSize = 7
+)
 
-	m.Payload
+func (m Message) EncodeSlicePointer() (*[]byte, error) {
+	msgSize := fixedHeaderSize
 
-	encodeMetadata(m.Metadata, bb)
-	meta := bb.Bytes()
-
-	spL := len(m.ServicePath)
-	smL := len(m.ServiceMethod)
-
-	var err error
-	payload := m.Payload
-	if m.CompressType() != None {
-		compressor := Compressors[m.CompressType()]
-		if compressor == nil {
-			m.SetCompressType(None)
-		} else {
-			payload, err = compressor.Zip(m.Payload)
-			if err != nil {
-				m.SetCompressType(None)
-				payload = m.Payload
-			}
-		}
+	trace := false
+	if len(m.TraceId) != 0 { // 说明此时有traceId
+		trace = true
+		msgSize += 24
 	}
 
-	totalL := (4 + spL) + (4 + smL) + (4 + len(meta)) + (4 + len(payload))
+	//if m.AltKey != "" {
+	//	msgSize += 1 + len(m.AltKey) // 第一个字节表示字符串的长度   // Metadata的处理形式类似
+	//}
 
-	// header + dataLen + spLen + sp + smLen + sm + metaL + meta + payloadLen + payload
-	metaStart := 12 + 4 + (4 + spL) + (4 + smL)
+	bufP := bufferPool.Get(msgSize)
+	buf := *bufP
+	buf[0] = DataType
+	buf[1] = m.MsgType
+	binary.BigEndian.PutUint32(buf[2:6], uint32(m.Payload.Size()))
+	startIndex := 8
+	if trace {
+		buf[7] = 0x1               // set flag
+		copy(buf[8:24], m.TraceId) // 16byte
+		copy(buf[24:32], m.SpanId) // 8byte
+		startIndex = 33
+	}
+	err := m.Payload.Unmarshal(buf[startIndex:])
+	if err != nil {
+		return nil, err
+	}
+	return bufP, nil
+}
 
-	payLoadStart := metaStart + (4 + len(meta))
-	l := 12 + 4 + totalL
+func (m Message) Reset() {
+	m.TraceId = nil
+	m.SpanId = nil
+}
 
-	data := bufferPool.Get(l)
-	copy(*data, m.Header[:])
-
-	// totalLen
-	binary.BigEndian.PutUint32((*data)[12:16], uint32(totalL))
-
-	binary.BigEndian.PutUint32((*data)[16:20], uint32(spL))
-	copy((*data)[20:20+spL], util.StringToSliceByte(m.ServicePath))
-
-	binary.BigEndian.PutUint32((*data)[20+spL:24+spL], uint32(smL))
-	copy((*data)[24+spL:metaStart], util.StringToSliceByte(m.ServiceMethod))
-
-	binary.BigEndian.PutUint32((*data)[metaStart:metaStart+4], uint32(len(meta)))
-	copy((*data)[metaStart+4:], meta)
-
-	binary.BigEndian.PutUint32((*data)[payLoadStart:payLoadStart+4], uint32(len(payload)))
-	copy((*data)[payLoadStart+4:], payload)
-
-	return data
+// PutData puts the byte slice into pool.
+func PutData(data *[]byte) {
+	bufferPool.Put(data)
 }
