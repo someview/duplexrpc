@@ -2,7 +2,10 @@ package protocol
 
 import (
 	"encoding/binary"
+	"github.com/smallnest/rpcx/log"
+	"io"
 	"rpc-oneway/util"
+	"runtime"
 )
 
 type FrameType byte
@@ -28,12 +31,14 @@ type SizeableMarshaller interface {
 // Message DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
 // 需要有一个控制信号, 用于在检测时，完成这个处理过程
 type Message struct {
+	FixedHeader [7]byte
+
 	TraceId  []byte
 	SpanId   []byte
+	MsgType  byte
 	AltKey   string
 	Metadata map[string]string
 	Payload  SizeableMarshaller
-	MsgType  byte
 }
 
 func NewMessage() *Message {
@@ -46,7 +51,7 @@ const (
 	fixedHeaderSize = 7
 )
 
-func (m Message) EncodeSlicePointer() (*[]byte, error) {
+func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	msgSize := fixedHeaderSize
 
 	trace := false
@@ -78,7 +83,7 @@ func (m Message) EncodeSlicePointer() (*[]byte, error) {
 	return bufP, nil
 }
 
-func (m Message) Reset() {
+func (m *Message) Reset() {
 	m.TraceId = nil
 	m.SpanId = nil
 }
@@ -86,4 +91,45 @@ func (m Message) Reset() {
 // PutData puts the byte slice into pool.
 func PutData(data *[]byte) {
 	bufferPool.Put(data)
+}
+
+// Decode decodes a message from reader.
+func (m *Message) Decode(r io.Reader) error {
+	defer func() {
+		if err := recover(); err != nil {
+			var errStack = make([]byte, 1024)
+			n := runtime.Stack(errStack, true)
+			log.Errorf("panic in message decode: %v, stack: %s", err, errStack[:n])
+
+		}
+	}()
+
+	_, err := io.ReadFull(r, m.FixedHeader[:])
+	if err != nil {
+		return err
+	}
+	// 解析出msg，traceId, spanId, 并将traceId, spanId设置在ctx中, 用户层从ctx中获取
+	m.MsgType = m.FixedHeader[2]
+	if traced(m.FixedHeader[6]) {
+		_, err := io.ReadFull(r, m.TraceId)
+		if err != nil {
+			return err
+		}
+		_, err = io.ReadFull(r, m.SpanId)
+		if err != nil {
+			return err
+		}
+	}
+	payloadLen := binary.BigEndian.Uint32(m.FixedHeader[2:6])
+	lenData := make([]byte, payloadLen)
+	_, err = io.ReadFull(r, lenData)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func traced(flag byte) bool { // 表示二进制的第一位是1
+	return flag&0x80 == 1
 }

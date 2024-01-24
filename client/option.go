@@ -2,7 +2,6 @@ package client
 
 import (
 	"crypto/tls"
-	"rpc-oneway/protocol"
 	"time"
 )
 
@@ -33,9 +32,6 @@ type Option struct {
 
 	// Breaker is used to config CircuitBreaker
 	// GenBreaker func() Breaker
-
-	SerializeType protocol.SerializeType
-	CompressType  protocol.CompressType
 
 	// send heartbeat message to service and check responses
 	Heartbeat bool

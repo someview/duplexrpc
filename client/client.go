@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"net"
@@ -12,20 +13,24 @@ var (
 	ErrUnsupportedCodec = errors.New("unsupported codec")
 )
 
-type muxClient struct {
+const (
+	// ReaderBuffsize is used for bufio reader.
+	ReaderBuffsize = 16 * 1024
+	// WriterBuffsize is used for bufio writer.
+	WriterBuffsize = 16 * 1024
+)
+
+type MuxClient struct {
 	// 这是和连接相关的部分
 	closing bool // whether the server is going to close this connection
 	net.Conn
-}
-
-// OnRequest is called when the connection creates.
-
-func (c *muxClient) handleServerRequest() {
-
+	option Option
+	r      *bufio.Reader
+	recv   RecvFunc
 }
 
 // Send 用户层调用接口
-func (c *muxClient) Send(ctx context.Context, msgType byte, req any) error {
+func (c *MuxClient) Send(ctx context.Context, msgType byte, req any) error {
 	// todo ctx
 	if c.closing {
 		return ErrShutdown
@@ -55,7 +60,3 @@ func (c *muxClient) Send(ctx context.Context, msgType byte, req any) error {
 	protocol.PutData(allData)
 	return err
 }
-
-
-
-func(c *muxClient)

@@ -14,3 +14,6 @@ type RPCClient interface {
 	IsClosing() bool
 	IsShutdown() bool
 }
+
+type SendFunc func(ctx context.Context, msgType int32, msg any) error
+type RecvFunc func(ctx context.Context, msgType int32, msg any) error
