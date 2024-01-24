@@ -107,7 +107,11 @@ func (c *MuxClient) RecvMsg(ctx context.Context, msgType int32, m any) error {
 	if err != nil {
 		return err
 	}
-	// 允许为每一种消息指定特殊的编解码
-	// unmarshal这条消息,并且继续解码
+	res, ok := m.(protocol.SizeableMarshaller)
+	if !ok {
+		return ErrUnsupportedCodec
+	}
+	_, err = res.Unmarshal(msg.Payload)
+	return err
 
 }

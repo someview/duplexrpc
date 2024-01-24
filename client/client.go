@@ -23,7 +23,7 @@ const (
 type MuxClient struct {
 	// 这是和连接相关的部分
 	closing bool // whether the server is going to close this connection
-	net.Conn
+
 	option Option
 	r      *bufio.Reader
 	recv   RecvFunc
@@ -41,7 +41,9 @@ func (c *MuxClient) Send(ctx context.Context, msgType byte, req any) error {
 	}
 
 	msg := protocol.NewMessage()
-	msg.Payload = payload
+	buf:= make([]byte, msg)
+	payload.MarshalToSizedBuffer()
+	msg.Payload =
 	msg.MsgType = msgType
 	allData, err := msg.EncodeSlicePointer()
 	if err != nil {

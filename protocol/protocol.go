@@ -32,13 +32,12 @@ type SizeableMarshaller interface {
 // 需要有一个控制信号, 用于在检测时，完成这个处理过程
 type Message struct {
 	FixedHeader [7]byte
-
-	TraceId  []byte
-	SpanId   []byte
-	MsgType  byte
-	AltKey   string
-	Metadata map[string]string
-	Payload  SizeableMarshaller
+	TraceId     []byte
+	SpanId      []byte
+	MsgType     byte
+	AltKey      string
+	Metadata    map[string]string
+	Payload     []byte
 }
 
 func NewMessage() *Message {
@@ -68,7 +67,7 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	buf := *bufP
 	buf[0] = DataType
 	buf[1] = m.MsgType
-	binary.BigEndian.PutUint32(buf[2:6], uint32(m.Payload.Size()))
+
 	startIndex := 8
 	if trace {
 		buf[7] = 0x1               // set flag
@@ -76,10 +75,7 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 		copy(buf[24:32], m.SpanId) // 8byte
 		startIndex = 33
 	}
-	err := m.Payload.Unmarshal(buf[startIndex:])
-	if err != nil {
-		return nil, err
-	}
+	copy(buf[startIndex:], m.Payload)
 	return bufP, nil
 }
 
