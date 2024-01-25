@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/binary"
+	"errors"
 	"github.com/smallnest/rpcx/log"
 	"io"
 	"rpc-oneway/util"
@@ -10,7 +11,10 @@ import (
 
 type FrameType byte
 
-var bufferPool = util.NewLimitedPool(512, 4096)
+var (
+	bufferPool          = util.NewLimitedPool(512, 4096)
+	ErrUnsupportedCodec = errors.New("unsupported codec")
+)
 
 const (
 	InitialType     FrameType = iota
@@ -37,7 +41,8 @@ type Message struct {
 	MsgType     byte
 	AltKey      string
 	Metadata    map[string]string
-	Payload     []byte
+	Data        any
+	DataBuf     []byte
 }
 
 func NewMessage() *Message {
@@ -50,9 +55,17 @@ const (
 	fixedHeaderSize = 7
 )
 
+// todo 改进这个过程，让buffer的释放显得没有这么多突兀
 func (m *Message) EncodeSlicePointer() (*[]byte, error) {
-	msgSize := fixedHeaderSize
+	// 判断data的编解码类型是否支持
+	// todo 决定这里是否可以不适用呢
+	payload := m.Data.(SizeableMarshaller)
+	if payload == nil {
+		return nil, ErrUnsupportedCodec
+	}
 
+	dataSize := payload.Size()
+	msgSize := fixedHeaderSize + dataSize
 	trace := false
 	if len(m.TraceId) != 0 { // 说明此时有traceId
 		trace = true
@@ -75,7 +88,10 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 		copy(buf[24:32], m.SpanId) // 8byte
 		startIndex = 33
 	}
-	copy(buf[startIndex:], m.Payload)
+	_, err := payload.MarshalToSizedBuffer(buf[startIndex:])
+	if err != nil {
+		return nil, err
+	}
 	return bufP, nil
 }
 
@@ -117,12 +133,17 @@ func (m *Message) Decode(r io.Reader) error {
 		}
 	}
 	payloadLen := binary.BigEndian.Uint32(m.FixedHeader[2:6])
-	lenData := make([]byte, payloadLen)
-	_, err = io.ReadFull(r, lenData)
+
+	if cap(m.DataBuf) >= int(payloadLen) { // reuse data
+		m.DataBuf = m.DataBuf[:payloadLen]
+	} else {
+		m.DataBuf = make([]byte, payloadLen)
+	}
+
+	_, err = io.ReadFull(r, m.DataBuf)
 	if err != nil {
 		return err
 	}
-
 	return err
 }
 

@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -20,7 +19,7 @@ func (c *MuxClient) Connect(network, address string) error {
 	var conn net.Conn
 	var err error
 	if network == "tcp" {
-
+		conn, err = newDirectConn(c, network, address)
 	} else {
 		return errUnsupportedTransProtocol
 	}
@@ -36,12 +35,13 @@ func (c *MuxClient) Connect(network, address string) error {
 		}
 
 		c.Conn = conn
-		c.r = bufio.NewReaderSize(conn, ReaderBuffsize)
+		c.r = bufio.NewReaderSize(conn, ReaderBufsize)
 
 		// start reading and writing since connected
 		go c.readLoop()
 		if c.option.Heartbeat && c.option.HeartbeatInterval > 0 {
-			go c.heartbeat()
+			// todo heart message
+			//go c.heartbeat()
 		}
 	}
 
@@ -81,6 +81,7 @@ func (c *MuxClient) readLoop() {
 	var err error
 
 	for err == nil {
+		// 需要排除掉非业务类型的消息
 		msg := protocol.NewMessage()
 		if c.option.IdleTimeout != 0 {
 			_ = c.Conn.SetDeadline(time.Now().Add(c.option.IdleTimeout))
@@ -90,28 +91,23 @@ func (c *MuxClient) readLoop() {
 		if err != nil {
 			break
 		}
-		c.recv
+		if c.option.BidirectionalBlock {
+			c.ServerMessageChan <- msg
+		} else {
+			select {
+			case c.ServerMessageChan <- msg:
+			default: // put to Pool if we use pool
+			}
+		}
 	}
 
-	// todo 添加error类型的判断
+	c.CloseWithReason(err)
 }
 
-// RecvMsg 当前暂时可以不用传递
-func (c *MuxClient) RecvMsg(ctx context.Context, msgType int32, m any) error {
-	msg := protocol.NewMessage()
-	if c.option.IdleTimeout != 0 {
-		_ = c.Conn.SetDeadline(time.Now().Add(c.option.IdleTimeout))
+func (c *MuxClient) CloseWithReason(err error) {
+	if c.closing {
+		_ = c.Conn.Close()
+		c.closing = true
+		log.Errorf("rpcx: client protocol error: %v", err)
 	}
-
-	err := msg.Decode(c.r)
-	if err != nil {
-		return err
-	}
-	res, ok := m.(protocol.SizeableMarshaller)
-	if !ok {
-		return ErrUnsupportedCodec
-	}
-	_, err = res.Unmarshal(msg.Payload)
-	return err
-
 }

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"rpc-oneway/protocol"
 	"rpc-oneway/selector"
 	"sync"
 )
@@ -23,7 +24,7 @@ type Closeable interface {
 // XClient 泛化接口, msgType用于peer之间传输的消息类型, 由应用本身协商即可
 type XClient interface {
 	Send(ctx context.Context, msgType byte, args any) error
-	Recv(ctx context.Context, msgType byte, args any) error
+	Recv() chan *protocol.Message
 	Closeable
 }
 
@@ -49,12 +50,12 @@ func (*xClient) Close() error {
 }
 
 // Recv implements XClient.
-func (*xClient) Recv(ctx context.Context, msgType int32, args any) error {
-	panic("unimplemented")
+func (*xClient) Recv() chan *protocol.Message {
+	return make(chan *protocol.Message)
 }
 
 // Send implements XClient.
-func (c *xClient) Send(ctx context.Context, msgType int32, args any) error {
+func (c *xClient) Send(ctx context.Context, msgType byte, args any) error {
 	if c.isShutdown {
 		return ErrXClientShutdown
 	}
@@ -112,25 +113,6 @@ func (c *xClient) getCachedClient(k string, servicePath, serviceMethod string, a
 	if c.isShutdown {
 		return nil, errors.New("this xclient is closed")
 	}
-
-	// if this client is broken
-	// breaker, ok := c.breakers.Load(k)
-	// if ok && !breaker.(Breaker).Ready() {
-	// 	return nil, ErrBreakerOpen
-	// }
-
-	// c.mu.Lock()
-	// client = c.findCachedClient(k, servicePath, serviceMethod)
-	// if client != nil {
-	// 	if !client.IsClosing() && !client.IsShutdown() {
-	// 		c.mu.Unlock()
-	// 		return client, nil
-	// 	}
-	// 	c.deleteCachedClient(client, k, servicePath, serviceMethod)
-	// }
-
-	// client = c.findCachedClient(k, servicePath, serviceMethod)
-	// c.mu.Unlock()
 
 	return client, nil
 }
