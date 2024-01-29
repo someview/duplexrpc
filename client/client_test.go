@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"rpc-oneway/protocol"
 	"rpc-oneway/server"
@@ -37,7 +36,7 @@ func TestClient(t *testing.T) {
 	srv := server.NewServer()
 	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
 	srv.AddHandler(1, func(msg *protocol.Message) error {
-		fmt.Println("进来,收到消息:", msg.DataBuf)
+		// fmt.Println("进来,收到消息:", msg.DataBuf)
 		return nil
 	})
 	go func() {
@@ -64,4 +63,34 @@ func TestClient(t *testing.T) {
 	}
 
 	time.Sleep(time.Second * 2)
+}
+
+func BenchmarkMuxClient(b *testing.B) {
+	srv := server.NewServer()
+	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
+	srv.AddHandler(1, func(msg *protocol.Message) error {
+		// fmt.Println("进来,收到消息:", msg.DataBuf)
+		return nil
+	})
+	go func() {
+		if err := srv.Serve("tcp", ":8080"); err != nil {
+			log.Fatalln("err:", err)
+		}
+	}()
+
+	// 哎呦,就这么处理吧
+	cli := &MuxClient{}
+	if err := cli.Connect("tcp", "127.0.0.1:8080"); err != nil {
+		log.Fatalln("err:", err)
+	}
+	b.ResetTimer()
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			if err := cli.Send(context.Background(), 1, &testdata.ClientMessage{
+				Header: &testdata.Header{TraceId: "123456789"},
+			}); err != nil {
+				log.Fatalln("err:", err)
+			}
+		}
+	})
 }

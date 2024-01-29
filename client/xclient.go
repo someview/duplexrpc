@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"rpc-oneway/protocol"
-	"rpc-oneway/selector"
 	"sync"
 )
 
@@ -38,8 +37,8 @@ type xClient struct {
 	stickyRPCClient RPCClient
 	stickyK         string
 
-	selector selector.Selector
-	option   Option
+	// selector selector.Selector
+	option Option
 }
 
 var _ XClient = (*xClient)(nil)
@@ -82,9 +81,10 @@ func (c *xClient) selectClient(ctx context.Context, servicePath, serviceMethod s
 		c.mu.Unlock()
 		return c.stickyK, c.stickyRPCClient, nil
 	}
-	fn := c.selector.Select
+	// fn := c.selector.Select
 
-	k := fn(ctx, servicePath, serviceMethod, args)
+	// k := fn(ctx, servicePath, serviceMethod, args)
+	k := ""
 	c.mu.Unlock()
 	// 暂时无可用的服务
 	if k == "" {
