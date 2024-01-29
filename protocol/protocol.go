@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"net"
 	"rpc-oneway/util"
 	"runtime"
 
@@ -36,6 +37,7 @@ type SizeableMarshaller interface {
 // Message DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
 // 需要有一个控制信号, 用于在检测时，完成这个处理过程
 type Message struct {
+	From        net.Conn
 	FixedHeader [7]byte
 	TraceId     []byte
 	SpanId      []byte
