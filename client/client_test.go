@@ -45,12 +45,12 @@ func TestClient(t *testing.T) {
 			log.Fatalln("err:", err)
 		}
 	}()
-	defer func(srv *server.Server, ctx context.Context) {
-		err := srv.Shutdown(ctx)
-		if err != nil {
-			log.Println("err:", err)
-		}
-	}(srv, context.TODO())
+	//defer func(srv *server.Server, ctx context.Context) {
+	//	err := srv.Shutdown(ctx)
+	//	if err != nil {
+	//		log.Println("err:", err)
+	//	}
+	//}(srv, context.TODO())
 
 	time.Sleep(time.Second * 1)
 	cli := &MuxClient{}
