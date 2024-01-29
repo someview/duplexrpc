@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/panjf2000/ants/v2"
 	"github.com/smallnest/rpcx/log"
 	"github.com/soheilhy/cmux"
 )
@@ -36,7 +37,7 @@ type Handler func(*protocol.Message) error
 type Server struct {
 	readTimeout  time.Duration
 	writeTimeout time.Duration
-	pool         WorkerPool
+	pool         *ants.Pool
 	ln           net.Listener
 
 	mu sync.RWMutex

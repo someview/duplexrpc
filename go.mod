@@ -4,9 +4,10 @@ go 1.21.4
 
 require (
 	github.com/golang/protobuf v1.5.2
+	github.com/panjf2000/ants/v2 v2.9.0
 	github.com/smallnest/rpcx v1.8.24
 	github.com/soheilhy/cmux v0.1.5
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.8.2
 )
 
 require (
