@@ -3,10 +3,11 @@ package protocol
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/smallnest/rpcx/log"
 	"io"
 	"rpc-oneway/util"
 	"runtime"
+
+	"github.com/smallnest/rpcx/log"
 )
 
 type FrameType byte
@@ -81,12 +82,12 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	buf[0] = DataType
 	buf[1] = m.MsgType
 
-	startIndex := 8
+	startIndex := 7
 	if trace {
-		buf[7] = 0x1               // set flag
-		copy(buf[8:24], m.TraceId) // 16byte
-		copy(buf[24:32], m.SpanId) // 8byte
-		startIndex = 33
+		buf[6] = 0x1               // set flag
+		copy(buf[7:22], m.TraceId) // 16byte
+		copy(buf[23:30], m.SpanId) // 8byte
+		startIndex = 31
 	}
 	_, err := payload.MarshalToSizedBuffer(buf[startIndex:])
 	if err != nil {

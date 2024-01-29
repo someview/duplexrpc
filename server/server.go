@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"github.com/smallnest/rpcx/log"
-	"github.com/soheilhy/cmux"
 	"io"
 	"net"
 	"rpc-oneway/protocol"
@@ -13,6 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/smallnest/rpcx/log"
+	"github.com/soheilhy/cmux"
 )
 
 // ErrServerClosed is returned by the Server's Serve, ListenAndServe after a call to Shutdown or Close.
@@ -51,10 +52,14 @@ type Server struct {
 
 func NewServer(options ...OptionFn) *Server {
 	s := &Server{}
+	s.activeConn = make(map[net.Conn]struct{})
+	s.router = make(map[byte]Handler) // 可以在optionFn中寻找一个进行处理
+	s.options = make(map[string]interface{})
 	// 设置保活时间
 	if s.options["TCPKeepAlivePeriod"] == nil {
 		s.options["TCPKeepAlivePeriod"] = 3 * time.Minute
 	}
+
 	return s
 }
 
@@ -101,19 +106,18 @@ func (s *Server) serveListener(ln net.Listener) error {
 				<-s.doneChan
 				return ErrServerClosed
 			}
-
-			if ne, ok := e.(net.Error); ok && ne.Temporary() {
+			// 对于临时性错误，需要重试，例如断电、中断灯。参考grpc-go lis.Accept
+			if ne, ok := e.(interface{ Temporary() bool }); ok && ne.Temporary() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
 				} else {
 					tempDelay *= 2
 				}
-
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
 
-				log.Errorf("rpcx: Accept error: %v; retrying in %v", e, tempDelay)
+				log.Errorf("rpcx: Accept error: %v; retrying in %v", ne, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
@@ -191,7 +195,7 @@ func (s *Server) serveConn(conn net.Conn) {
 				s.processOneRequest(ctx, req)
 			})
 		} else {
-			s.processOneRequest(ctx, req)
+			go s.processOneRequest(ctx, req)
 		}
 	}
 }
@@ -240,11 +244,11 @@ func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Mess
 	//
 	//	return
 	//}
-
-	cancelFunc := parseServerTimeout(ctx, req)
-	if cancelFunc != nil {
-		defer cancelFunc()
-	}
+	// 暂时也不需要考虑解析超时
+	// cancelFunc := parseServerTimeout(ctx, req)
+	// if cancelFunc != nil {
+	// 	defer cancelFunc()
+	// }
 
 	if req.Metadata == nil {
 		req.Metadata = make(map[string]string)
@@ -258,26 +262,29 @@ func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Mess
 		}
 		return
 	}
-	return
 }
 
-// 聊天系统中暂时不需要同步的方法调用，因此这个方法暂时不考虑
-func parseServerTimeout(ctx *ClientRequestContext, req *protocol.Message) context.CancelFunc {
-	//if req == nil || req.Metadata == nil {
-	//	return nil
-	//}
-	//
-	//st := req.Metadata[share.ServerTimeout]
-	//if st == "" {
-	//	return nil
-	//}
-	//
-	//timeout, err := strconv.ParseInt(st, 10, 64)
-	//if err != nil {
-	//	return nil
-	//}
-	//
-	//newCtx, cancel := context.WithTimeout(ctx.Context, time.Duration(timeout)*time.Millisecond)
-	//ctx.Context = newCtx
+// var shutdownPollInterval = 1000 * time.Millisecond
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	// var err error
+	// 应该采用原子性变更
+	if atomic.CompareAndSwapInt32(&s.inShutdown, 0, 1) {
+		log.Info("shutdown begin")
+		s.mu.Lock()
+		if s.ln != nil {
+			s.ln.Close()
+		}
+		for conn := range s.activeConn {
+			if tcpConn, ok := conn.(*net.TCPConn); ok {
+				tcpConn.CloseRead()
+			}
+		}
+		s.mu.Unlock()
+		// todo 这里是否需要考虑优雅处理呢
+		// select{
+		// 	case
+		// }
+	}
 	return nil
 }

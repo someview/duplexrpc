@@ -1,8 +1,6 @@
 package util
 
 import (
-	"fmt"
-	"rpc-oneway/protocol"
 	"sync/atomic"
 )
 
@@ -32,20 +30,20 @@ func NewWriteQuota(sz int64, done chan struct{}) *WriteQuota {
 	return w
 }
 
-func (w *WriteQuota) get(stream protocol.Stream) error {
-	for {
-		if atomic.LoadInt64(&w.quota) > 0 {
-			atomic.AddInt64(&w.quota, -stream.Size)
-			return nil
-		}
-		select {
-		case <-w.ch:
-			continue
-		case <-stream.Done:
-			return fmt.Errorf("stream closed")
-		}
-	}
-}
+// func (w *WriteQuota) get(stream protocol.Stream) error {
+// 	for {
+// 		if atomic.LoadInt64(&w.quota) > 0 {
+// 			atomic.AddInt64(&w.quota, -stream.Size)
+// 			return nil
+// 		}
+// 		select {
+// 		case <-w.ch:
+// 			continue
+// 		case <-stream.Done:
+// 			return fmt.Errorf("stream closed")
+// 		}
+// 	}
+// }
 
 func (w *WriteQuota) realReplenish(n int) {
 	sz := int64(n)
