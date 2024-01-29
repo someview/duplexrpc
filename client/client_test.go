@@ -37,7 +37,7 @@ func TestClient(t *testing.T) {
 	srv := server.NewServer()
 	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
 	srv.AddHandler(1, func(msg *protocol.Message) error {
-		fmt.Println("进来,收到消息:", msg)
+		fmt.Println("进来,收到消息:", msg.DataBuf)
 		return nil
 	})
 	go func() {

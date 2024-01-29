@@ -32,7 +32,6 @@ type MuxClient struct {
 
 // Send 用户层调用接口
 func (c *MuxClient) Send(ctx context.Context, msgType byte, req any) error {
-	// todo ctx
 	if c.closing {
 		return ErrShutdown
 	}
