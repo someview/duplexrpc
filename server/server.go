@@ -31,7 +31,7 @@ const (
 	// WriteChanSize = 1024 * 1024
 )
 
-type Handler func(ctx *ClientRequestContext, msg any) error
+type Handler func(*protocol.Message) error
 
 type Server struct {
 	readTimeout  time.Duration
@@ -62,7 +62,7 @@ func NewServer(options ...OptionFn) *Server {
 	return s
 }
 
-func (s *Server) AddHandler(msgType byte, handler func(requestContext *ClientRequestContext, msg any) error) {
+func (s *Server) AddHandler(msgType byte, handler func(*protocol.Message) error) {
 	s.router[msgType] = handler
 }
 
@@ -131,9 +131,9 @@ func (s *Server) serveListener(ln net.Listener) error {
 		if tc, ok := conn.(*net.TCPConn); ok {
 			period := s.options["TCPKeepAlivePeriod"]
 			if period != nil {
-				tc.SetKeepAlive(true)
-				tc.SetKeepAlivePeriod(period.(time.Duration))
-				tc.SetLinger(10)
+				_ = tc.SetKeepAlive(true)
+				_ = tc.SetKeepAlivePeriod(period.(time.Duration))
+				_ = tc.SetLinger(10)
 			}
 		}
 
@@ -255,7 +255,7 @@ func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Mess
 
 	// use handlers first
 	if handler, ok := s.router[req.MsgType]; ok {
-		err := handler(ctx, req.DataBuf)
+		err := handler(req)
 		if err != nil {
 			log.Errorf("[handler internal error]: servicepath: %s, servicemethod, err: %v", req.MsgType, err)
 		}

@@ -7,9 +7,6 @@ import (
 	"sync"
 )
 
-// var _ context.Context = &Context{}
-
-// Context is a rpc-oneway customized Context that can contains multiple values.
 type Context struct {
 	tagsLock *sync.Mutex
 	tags     map[interface{}]interface{}

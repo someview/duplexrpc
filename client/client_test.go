@@ -36,7 +36,7 @@ var _ protocol.SizeableMarshaller = (*msgMock)(nil)
 func TestClient(t *testing.T) {
 	srv := server.NewServer()
 	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
-	srv.AddHandler(1, func(ctx *server.ClientRequestContext, msg any) error {
+	srv.AddHandler(1, func(msg *protocol.Message) error {
 		fmt.Println("进来,收到消息:", msg)
 		return nil
 	})
