@@ -81,6 +81,7 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	buf := *bufP
 	buf[0] = DataType
 	buf[1] = m.MsgType
+	binary.BigEndian.PutUint32(buf[2:6], uint32(dataSize))
 
 	startIndex := 7
 	if trace {
@@ -122,7 +123,7 @@ func (m *Message) Decode(r io.Reader) error {
 		return err
 	}
 	// 解析出msg，traceId, spanId, 并将traceId, spanId设置在ctx中, 用户层从ctx中获取
-	m.MsgType = m.FixedHeader[2]
+	m.MsgType = m.FixedHeader[1]
 	if traced(m.FixedHeader[6]) {
 		_, err := io.ReadFull(r, m.TraceId)
 		if err != nil {

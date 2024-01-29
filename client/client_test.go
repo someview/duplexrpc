@@ -63,5 +63,5 @@ func TestClient(t *testing.T) {
 		log.Fatalln("err:", err)
 	}
 
-	time.Sleep(time.Minute * 2)
+	time.Sleep(time.Second * 2)
 }

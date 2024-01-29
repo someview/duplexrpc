@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"rpc-oneway/protocol"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -220,14 +219,14 @@ func (s *Server) readRequest(ctx context.Context, r io.Reader) (*protocol.Messag
 }
 
 func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Message) {
-	defer func() {
-		if r := recover(); r != nil {
-			buf := make([]byte, 1024)
-			buf = buf[:runtime.Stack(buf, true)]
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		buf := make([]byte, 1024)
+	// 		buf = buf[:runtime.Stack(buf, true)]
 
-			log.Errorf("failed to handle the request: %v， stacks: %s", r, buf)
-		}
-	}()
+	// 		log.Errorf("failed to handle the request: %v， stacks: %s", r, buf)
+	// 	}
+	// }()
 
 	//// 心跳请求，直接处理返回
 	//if req.IsHeartbeat() {
@@ -256,7 +255,7 @@ func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Mess
 
 	// use handlers first
 	if handler, ok := s.router[req.MsgType]; ok {
-		err := handler(ctx, req.Data)
+		err := handler(ctx, req.DataBuf)
 		if err != nil {
 			log.Errorf("[handler internal error]: servicepath: %s, servicemethod, err: %v", req.MsgType, err)
 		}
