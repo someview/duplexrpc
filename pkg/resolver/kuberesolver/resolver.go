@@ -3,6 +3,7 @@ package kuberesolver
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 	"rpc-oneway/pkg/resolver"
 
 	jsoniter "github.com/json-iterator/go"
-	golog "gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.golog.git"
+	//golog "gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.golog.git"
 )
 
 var _dialer = &net.Dialer{
@@ -47,7 +48,7 @@ type kubeResolver struct {
 	serviceName string
 	namespace   string
 	version     string
-	logger      golog.Logger
+	// logger      golog.Logger
 }
 
 // Refresh implements resolver.Resolver.
@@ -86,7 +87,7 @@ func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.ServiceIn
 	//}
 	marshal, err := jsoniter.Marshal(req)
 	if err != nil {
-		p.logger.PrintfError("layer:grpc,service:%s,desc:marshal req error,alert:code bug\n", p.serviceName, err)
+		//p.logger.PrintfError("layer:grpc,service:%s,desc:marshal req error,alert:code bug\n", p.serviceName, err)
 		time.Sleep(time.Second)
 		return nil
 	}
@@ -94,19 +95,20 @@ func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.ServiceIn
 	reader := bytes.NewReader(marshal)
 	resp, err := p.client.Post(p.addr, "application/json", reader)
 	if err != nil {
-		p.logger.PrintfError("layer:grpc,service:%s,desc:post error %v,alert:service may occur exception, need check proxy and client\n", p.serviceName, err)
+		// p.logger.PrintfError("layer:grpc,service:%s,desc:post error %v,alert:service may occur exception, need check proxy and client\n", p.serviceName, err)
 		time.Sleep(time.Second)
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNoContent {
-			if p.logger.Enable(golog.LogLevelDebug) {
-				p.logger.PrintfDebug("layer:grpc,service:%v,desc:endpoints无变更\n", p.serviceName)
-			}
+			// if p.logger.Enable(golog.LogLevelDebug) {
+			// 	p.logger.PrintfDebug("layer:grpc,service:%v,desc:endpoints无变更\n", p.serviceName)
+			// }
 		} else {
 			bodyBytes, _ := io.ReadAll(resp.Body)
-			p.logger.PrintlnWarning("layer:grpc,service:%s,desc:res status-%v,reason-%s,alert:service may occur exception, need check proxy and client\n",
-				p.serviceName, resp.StatusCode, string(bodyBytes))
+			// p.logger.PrintlnWarning("layer:grpc,service:%s,desc:res status-%v,reason-%s,alert:service may occur exception, need check proxy and client\n",
+			// 	p.serviceName, resp.StatusCode, string(bodyBytes))
+			fmt.Println("bodyBytes:", bodyBytes)
 		}
 		_ = resp.Body.Close()
 		time.Sleep(time.Second)
@@ -116,17 +118,17 @@ func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.ServiceIn
 	err = jsoniter.NewDecoder(resp.Body).Decode(obj)
 	_ = resp.Body.Close()
 	if err != nil {
-		p.logger.PrintfError("layer:grpc,service:%s,desc:unmarshal res error %v", p.serviceName, err)
+		// p.logger.PrintfError("layer:grpc,service:%s,desc:unmarshal res error %v", p.serviceName, err)
 		time.Sleep(time.Second)
 		return nil
 	}
 	// https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
 	// https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
 	// 版本号不相等时，向下传递地址更新事件
-	if p.logger.Enable(golog.LogLevelDebug) {
-		p.logger.PrintlnDebug("layer:grpc,service:", p.serviceName, "desc:服务列表发生变化,当前版本号-",
-			obj.ResourceVersion, "历史版本号-", p.version, "端点列表-", obj.Endpoints)
-	}
+	// if p.logger.Enable(golog.LogLevelDebug) {
+	// 	p.logger.PrintlnDebug("layer:grpc,service:", p.serviceName, "desc:服务列表发生变化,当前版本号-",
+	// 		obj.ResourceVersion, "历史版本号-", p.version, "端点列表-", obj.Endpoints)
+	// }
 	p.version = obj.ResourceVersion
 	//更新服务端地址列表
 	p.mu.Lock()
@@ -148,17 +150,17 @@ func (k *kubeResolver) Stop() { // 退出循环
 
 // 暂时不做配置addr变更的动态监听
 // 对于所有的客户端来说，共用一个logger就可以了
-func NewKubeResolver(logger golog.Logger, cli *http.Client, registryUrl string, info TargetInfo) resolver.Resolver {
+func NewKubeResolver(cli *http.Client, registryUrl string, info TargetInfo) resolver.Resolver {
 	if info.scheme == LocalScheme {
 		//return newLocalDiscovery(info)
 		// todo 匹配非k8s环境
 		return nil
 	}
-	logger.PrintlnDebug("info: ", info.port, info.serviceName, info.serviceNamespace)
+	// logger.PrintlnDebug("info: ", info.port, info.serviceName, info.serviceNamespace)
 	res := &kubeResolver{
 		TargetInfo: info,
 		client:     &http.Client{Timeout: 40 * time.Second, Transport: _defaultTransport},
-		logger:     logger,
+		//logger:     logger,
 	}
 	res.Context, res.CancelFunc = context.WithCancel(context.Background())
 	return res
