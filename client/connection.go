@@ -5,10 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/smallnest/rpcx/log"
 	"net"
-	"rpc-oneway/protocol"
 	"time"
+
+	"rpc-oneway/protocol"
 )
 
 type ConnFactoryFn func(c *MuxClient, network, address string) (net.Conn, error)
@@ -35,7 +35,7 @@ func (c *MuxClient) Connect(network, address string) error {
 		}
 
 		c.Conn = conn
-		c.r = bufio.NewReaderSize(conn, ReaderBufsize)
+		c.r = bufio.NewReaderSize(conn, ReaderBufSize)
 
 		// start reading and writing since connected
 		go c.readLoop()
@@ -70,7 +70,7 @@ func newDirectConn(c *MuxClient, network, address string) (net.Conn, error) {
 	}
 
 	if err != nil {
-		log.Warnf("failed to dial server: %v", err)
+		fmt.Println("failed to dial server:", err)
 		return nil, err
 	}
 
@@ -108,6 +108,6 @@ func (c *MuxClient) CloseWithReason(err error) {
 	if c.closing {
 		_ = c.Conn.Close()
 		c.closing = true
-		log.Errorf("rpcx: client protocol error: %v", err)
+		fmt.Println("rpcx: client protocol error:", err)
 	}
 }

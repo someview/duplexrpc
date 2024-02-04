@@ -2,29 +2,9 @@ package protocol
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"io"
-	"net"
-	"rpc-oneway/util"
 	"runtime"
-
-	"github.com/smallnest/rpcx/log"
-)
-
-type FrameType byte
-
-var (
-	bufferPool          = util.NewLimitedPool(512, 4096)
-	ErrUnsupportedCodec = errors.New("unsupported codec")
-)
-
-const (
-	InitialType     FrameType = iota
-	InitialDoneType           = 1
-	DataType                  = 2
-	PingType                  = 6
-	PongType                  = 7
-	CloseType                 = 8
 )
 
 // SizeableMarshaller todo 将这里的接口和protobuf解码
@@ -34,35 +14,50 @@ type SizeableMarshaller interface {
 	Unmarshal([]byte) error
 }
 
-// Message DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
-// 需要有一个控制信号, 用于在检测时，完成这个处理过程
-type Message struct {
-	From        net.Conn
-	FixedHeader [7]byte
-	TraceId     []byte
-	SpanId      []byte
-	MsgType     byte
-	AltKey      string
-	Metadata    map[string]string
-	Data        any
-	DataBuf     []byte
+type BufGetter func(msgSize int) *[]byte
+
+// message DataFrame [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
+type message struct {
+	data    any    // 原始数据
+	payload []byte // 编码后的二进制数据
+	len     uint32 // 当前msg的长度
+	msgContext
 }
 
-func NewMessage() *Message {
-	return &Message{}
+// Recycle free msg to pool
+func (m *message) Recycle() {
+
 }
 
-// EncodeSlicePointer encodes messages as a byte slice pointer we can use pool to improve.
-// [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
+// SetReq implements Message.
+func (m *message) SetReq(req any) {
+	m.data = req
+}
+
+// Encode this method should be called after all msg info has been setted
+// bufP must be larger than m.Len()
+
+// Len implements Message.
+func (m *message) Len() uint32 {
+	return m.len
+}
+
+// Payload implements Message.
+func (m *message) Payload() []byte {
+	return m.payload
+}
+
+// // EncodeSlicePointer encodes messages as a byte slice pointer we can use pool to improve.
+// // [Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
 const (
 	fixedHeaderSize = 7
 )
 
-// todo 改进这个过程，让buffer的释放显得没有这么多突兀
-func (m *Message) EncodeSlicePointer() (*[]byte, error) {
+// // todo 改进这个过程，让buffer的释放显得没有这么多突兀
+func (m *message) Encode() (*[]byte, error) {
 	// 判断data的编解码类型是否支持
-	// todo 决定这里是否可以不适用呢
-	payload := m.Data.(SizeableMarshaller)
+	// todo 添加对binary类型的支持
+	payload := m.data.(SizeableMarshaller)
 	if payload == nil {
 		return nil, ErrUnsupportedCodec
 	}
@@ -70,7 +65,7 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	dataSize := payload.Size()
 	msgSize := fixedHeaderSize + dataSize
 	trace := false
-	if len(m.TraceId) != 0 { // 说明此时有traceId
+	if len(m.traceInfo) != 0 { // 说明此时有traceId
 		trace = true
 		msgSize += 24
 	}
@@ -82,14 +77,13 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	bufP := bufferPool.Get(msgSize)
 	buf := *bufP
 	buf[0] = DataType
-	buf[1] = m.MsgType
+	buf[1] = m.fixedHeader[1]
 	binary.BigEndian.PutUint32(buf[2:6], uint32(dataSize))
 
 	startIndex := 7
 	if trace {
-		buf[6] = 0x1               // set flag
-		copy(buf[7:22], m.TraceId) // 16byte
-		copy(buf[23:30], m.SpanId) // 8byte
+		buf[6] = 0x1                 // set flag
+		copy(buf[7:30], m.traceInfo) // 24byte
 		startIndex = 31
 	}
 	_, err := payload.MarshalToSizedBuffer(buf[startIndex:])
@@ -99,52 +93,43 @@ func (m *Message) EncodeSlicePointer() (*[]byte, error) {
 	return bufP, nil
 }
 
-func (m *Message) Reset() {
-	m.TraceId = nil
-	m.SpanId = nil
+func (m *message) Reset() {
+	m.traceInfo = nil
 }
 
-// PutData puts the byte slice into pool.
-func PutData(data *[]byte) {
-	bufferPool.Put(data)
-}
+// // PutData puts the byte slice into pool.
 
-// Decode decodes a message from reader.
-func (m *Message) Decode(r io.Reader) error {
+// // Decode decodes a message from reader.
+func (m *message) Decode(r io.Reader) error {
 	defer func() {
 		if err := recover(); err != nil {
 			var errStack = make([]byte, 1024)
 			n := runtime.Stack(errStack, true)
-			log.Errorf("panic in message decode: %v, stack: %s", err, errStack[:n])
+			fmt.Printf("panic in message decode: %v, stack: %s", err, errStack[:n])
 
 		}
 	}()
 
-	_, err := io.ReadFull(r, m.FixedHeader[:])
+	_, err := io.ReadFull(r, m.fixedHeader[:])
 	if err != nil {
 		return err
 	}
 	// 解析出msg，traceId, spanId, 并将traceId, spanId设置在ctx中, 用户层从ctx中获取
-	m.MsgType = m.FixedHeader[1]
-	if traced(m.FixedHeader[6]) {
-		_, err := io.ReadFull(r, m.TraceId)
-		if err != nil {
-			return err
-		}
-		_, err = io.ReadFull(r, m.SpanId)
+	if traced(m.fixedHeader[6]) {
+		_, err := io.ReadFull(r, m.traceInfo)
 		if err != nil {
 			return err
 		}
 	}
-	payloadLen := binary.BigEndian.Uint32(m.FixedHeader[2:6])
+	payloadLen := binary.BigEndian.Uint32(m.fixedHeader[2:6])
 
-	if cap(m.DataBuf) >= int(payloadLen) { // reuse data
-		m.DataBuf = m.DataBuf[:payloadLen]
+	if cap(m.payload) >= int(payloadLen) { // reuse data
+		m.payload = m.payload[:payloadLen]
 	} else {
-		m.DataBuf = make([]byte, payloadLen)
+		m.payload = make([]byte, payloadLen)
 	}
 
-	_, err = io.ReadFull(r, m.DataBuf)
+	_, err = io.ReadFull(r, m.payload)
 	if err != nil {
 		return err
 	}
@@ -153,4 +138,15 @@ func (m *Message) Decode(r io.Reader) error {
 
 func traced(flag byte) bool { // 表示二进制的第一位是1
 	return flag&0x80 == 1
+}
+
+var _ Message = (*message)(nil)
+
+func NewMessage() *message {
+	return &message{}
+}
+
+// fixme  make thie readable
+func PutData(data *[]byte) {
+	bufferPool.Put(data)
 }

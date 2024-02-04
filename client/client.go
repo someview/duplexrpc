@@ -2,9 +2,9 @@ package client
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"net"
+
 	"rpc-oneway/protocol"
 )
 
@@ -14,7 +14,7 @@ var (
 
 const (
 	// ReaderBuffsize is used for bufio reader.
-	ReaderBufsize = 16 * 1024
+	ReaderBufSize = 16 * 1024
 	// WriterBuffsize is used for bufio writer.
 	WriterBuffsize = 16 * 1024
 )
@@ -27,20 +27,20 @@ type MuxClient struct {
 	option Option
 	r      *bufio.Reader
 
-	ServerMessageChan chan<- *protocol.Message
+	ServerMessageChan chan<- protocol.Message
 }
 
 // Send 用户层调用接口
-func (c *MuxClient) Send(ctx context.Context, msgType byte, req any) error {
+func (c *MuxClient) Send(ctx protocol.MsgContext, req any) error {
 	if c.closing {
 		return ErrShutdown
 	}
 
 	msg := protocol.NewMessage()
-	msg.MsgType = msgType
-	msg.Data = req
+	msg.SetMsgType(ctx.MsgType())
+	msg.SetReq(req)
 
-	allData, err := msg.EncodeSlicePointer()
+	allData, err := msg.Encode()
 	if err != nil {
 		return err
 	}

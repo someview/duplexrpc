@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
-	"rpc-oneway/protocol"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"rpc-oneway/protocol"
+
 	"github.com/panjf2000/ants/v2"
-	"github.com/smallnest/rpcx/log"
 	"github.com/soheilhy/cmux"
 )
 
@@ -32,7 +33,8 @@ const (
 	// WriteChanSize = 1024 * 1024
 )
 
-type Handler func(*protocol.Message) error
+// todo 设置一个合理的consumer模式, 而不是每一个handler设置一个协程
+type Handler func(protocol.Message) error
 
 type Server struct {
 	readTimeout  time.Duration
@@ -63,16 +65,16 @@ func NewServer(options ...OptionFn) *Server {
 	return s
 }
 
-func (s *Server) AddHandler(msgType byte, handler func(*protocol.Message) error) {
+func (s *Server) AddHandler(msgType byte, handler func(protocol.Message) error) {
 	s.router[msgType] = handler
 }
 
 // SendMessage 反向发送的时候需要知道向哪一个conn发送消息
 func (s *Server) SendMessage(conn net.Conn, msgType byte, msg any) error {
 	req := protocol.NewMessage()
-	req.MsgType = msgType
-	req.Data = msg
-	allData, err := req.EncodeSlicePointer()
+	req.SetMsgType(msgType)
+	req.SetReq(msg)
+	allData, err := req.Encode()
 	if err != nil {
 		return err
 	}
@@ -117,7 +119,7 @@ func (s *Server) serveListener(ln net.Listener) error {
 					tempDelay = max
 				}
 
-				log.Errorf("rpcx: Accept error: %v; retrying in %v", ne, tempDelay)
+				fmt.Printf("rpcx: Accept error: %v; retrying in %v", ne, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
@@ -183,9 +185,9 @@ func (s *Server) serveConn(conn net.Conn) {
 		req, err := s.readRequest(ctx, r)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				log.Infof("client has closed this connection: %s", conn.RemoteAddr().String())
+				fmt.Println("client has closed this connection: %s", conn.RemoteAddr().String())
 			} else if errors.Is(err, net.ErrClosed) {
-				log.Infof("rpc-oneway: connection %s is closed", conn.RemoteAddr().String())
+				fmt.Println("rpc-oneway: connection %s is closed", conn.RemoteAddr().String())
 			}
 			return
 		}
@@ -207,7 +209,7 @@ func (s *Server) CloseConn(conn net.Conn) {
 	_ = conn.Close()
 }
 
-func (s *Server) readRequest(ctx context.Context, r io.Reader) (*protocol.Message, error) {
+func (s *Server) readRequest(ctx context.Context, r io.Reader) (protocol.Message, error) {
 	req := protocol.NewMessage()
 	err := req.Decode(r)
 	if err != nil {
@@ -219,7 +221,7 @@ func (s *Server) readRequest(ctx context.Context, r io.Reader) (*protocol.Messag
 	return req, err
 }
 
-func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Message) {
+func (s *Server) processOneRequest(ctx *ClientRequestContext, req protocol.Message) {
 	// defer func() {
 	// 	if r := recover(); r != nil {
 	// 		buf := make([]byte, 1024)
@@ -250,15 +252,15 @@ func (s *Server) processOneRequest(ctx *ClientRequestContext, req *protocol.Mess
 	// 	defer cancelFunc()
 	// }
 
-	if req.Metadata == nil {
-		req.Metadata = make(map[string]string)
-	}
+	// if req.Metadata == nil {
+	// 	req.Metadata = make(map[string]string)
+	// }
 
 	// use handlers first
-	if handler, ok := s.router[req.MsgType]; ok {
+	if handler, ok := s.router[req.MsgType()]; ok {
 		err := handler(req)
 		if err != nil {
-			log.Errorf("[handler internal error]: servicepath: %s, servicemethod, err: %v", req.MsgType, err)
+			fmt.Printf("[handler internal error]: servicepath: %s, servicemethod, err: %v", req.MsgType, err)
 		}
 		return
 	}
@@ -270,7 +272,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// var err error
 	// 应该采用原子性变更
 	if atomic.CompareAndSwapInt32(&s.inShutdown, 0, 1) {
-		log.Info("shutdown begin")
+		fmt.Println("server shut down")
 		s.mu.Lock()
 		if s.ln != nil {
 			s.ln.Close()

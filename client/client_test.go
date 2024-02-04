@@ -3,11 +3,12 @@ package client
 import (
 	"context"
 	"log"
+	"testing"
+	"time"
+
 	"rpc-oneway/protocol"
 	"rpc-oneway/server"
 	"rpc-oneway/testdata"
-	"testing"
-	"time"
 )
 
 type msgMock struct{}
@@ -35,7 +36,7 @@ var _ protocol.SizeableMarshaller = (*msgMock)(nil)
 func TestClient(t *testing.T) {
 	srv := server.NewServer()
 	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
-	srv.AddHandler(1, func(msg *protocol.Message) error {
+	srv.AddHandler(1, func(msg protocol.Message) error {
 		// fmt.Println("进来,收到消息:", msg.DataBuf)
 		return nil
 	})
@@ -56,7 +57,7 @@ func TestClient(t *testing.T) {
 	if err := cli.Connect("tcp", "127.0.0.1:8080"); err != nil {
 		log.Fatalln("err:", err)
 	}
-	if err := cli.Send(context.Background(), 1, &testdata.ClientMessage{
+	if err := cli.Send(protocol.GetMsgContext(context.TODO()), &testdata.ClientMessage{
 		Header: &testdata.Header{TraceId: "123456789"},
 	}); err != nil {
 		log.Fatalln("err:", err)
@@ -68,7 +69,7 @@ func TestClient(t *testing.T) {
 func BenchmarkMuxClient(b *testing.B) {
 	srv := server.NewServer()
 	// todo 将添加到的消息添加到handler里面, 这里为了避免使用反射，直接使用断言，这样效率会高得多
-	srv.AddHandler(1, func(msg *protocol.Message) error {
+	srv.AddHandler(1, func(msg protocol.Message) error {
 		// fmt.Println("进来,收到消息:", msg.DataBuf)
 		return nil
 	})
@@ -86,7 +87,7 @@ func BenchmarkMuxClient(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(p *testing.PB) {
 		for p.Next() {
-			if err := cli.Send(context.Background(), 1, &testdata.ClientMessage{
+			if err := cli.Send(protocol.GetMsgContext(context.TODO()), &testdata.ClientMessage{
 				Header: &testdata.Header{TraceId: "123456789"},
 			}); err != nil {
 				log.Fatalln("err:", err)

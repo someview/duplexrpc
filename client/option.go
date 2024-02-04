@@ -3,6 +3,10 @@ package client
 import (
 	"crypto/tls"
 	"time"
+
+	"rpc-oneway/pkg/resolver"
+	"rpc-oneway/pkg/selector"
+	"rpc-oneway/protocol"
 )
 
 // Option contains all options for creating clients.
@@ -20,8 +24,7 @@ type Option struct {
 	TLSConfig *tls.Config
 	// kcp.BlockCrypt
 	Block interface{}
-	// RPCPath for http connection
-	RPCPath string
+
 	// ConnectTimeout sets timeout for dialing
 	ConnectTimeout time.Duration
 	// IdleTimeout sets max idle time for underlying net.Conns
@@ -46,4 +49,9 @@ type Option struct {
 
 	// alaways use the selected server until it is bad
 	Sticky bool
+
+	selector.Selector
+	resolver.Resolver
+
+	serverMsgHandler func(protocol.Message)
 }
