@@ -95,3 +95,11 @@ func BenchmarkMuxClient(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkTimeSysCall(b *testing.B) {
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			_ = time.Now()
+		}
+	})
+}
