@@ -6,10 +6,13 @@ import (
 	"net"
 
 	"rpc-oneway/protocol"
+
+	"rpc-oneway/pkg/breaker"
 )
 
 var (
-	ErrShutdown = errors.New("connection is shut down")
+	ErrShutdown    = errors.New("connection is shut down")
+	ErrBreakerOpen = errors.New("breaker is open")
 )
 
 const (
@@ -23,6 +26,7 @@ type MuxClient struct {
 	// 这是和连接相关的部分
 	closing bool // whether the server is going to close this connection
 
+	breaker breaker.Breaker
 	net.Conn
 	option Option
 	r      *bufio.Reader
@@ -35,7 +39,10 @@ func (c *MuxClient) Send(ctx protocol.MsgContext, req any) error {
 	if c.closing {
 		return ErrShutdown
 	}
-
+	// todo 设置成中间件的形式
+	if c.breaker != nil && !c.breaker.Allow() {
+		return ErrBreakerOpen
+	}
 	msg := protocol.NewMessage()
 	msg.SetMsgType(ctx.MsgType())
 	msg.SetReq(req)
