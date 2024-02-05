@@ -21,5 +21,6 @@ type XClient interface {
 type RPCClient interface {
 	Connect(network, address string) error
 	IsShutdown() bool
+	Address() string
 	XClient
 }

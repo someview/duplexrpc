@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"net"
 
@@ -34,8 +35,12 @@ type MuxClient struct {
 	ServerMessageChan chan<- protocol.Message
 }
 
+func NewMuxClient() *MuxClient {
+	return &MuxClient{}
+}
+
 // Send 用户层调用接口
-func (c *MuxClient) Send(ctx protocol.MsgContext, req any) error {
+func (c *MuxClient) Send(cc context.Context, req any) error {
 	if c.closing {
 		return ErrShutdown
 	}
@@ -44,6 +49,7 @@ func (c *MuxClient) Send(ctx protocol.MsgContext, req any) error {
 		return ErrBreakerOpen
 	}
 	msg := protocol.NewMessage()
+	ctx := cc.(protocol.MsgContext)
 	msg.SetMsgType(ctx.MsgType())
 	msg.SetReq(req)
 
