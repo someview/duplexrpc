@@ -79,7 +79,7 @@ func (k *kubeResolver) Start(listener resolver.ServiceListener) {
 	}
 }
 
-func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.ServiceInstance {
+func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.Node {
 	//等待30s proxy释放连接
 	// p.callCount++
 	//if p.logger.Enable(golog.LogLevelDebug) {
@@ -132,12 +132,10 @@ func (p *kubeResolver) doLongPollingCall(req *ProxyRequest) []resolver.ServiceIn
 	p.version = obj.ResourceVersion
 	//更新服务端地址列表
 	p.mu.Lock()
-	var serviceInstances []resolver.ServiceInstance
+	var serviceInstances []resolver.Node
 
 	for _, end := range obj.Endpoints {
-		serviceInstances = append(serviceInstances, resolver.ServiceInstance{ // todo 添加负载指标到map
-			Endpoint: end.Url,
-		})
+		serviceInstances = append(serviceInstances, resolver.NewNode(end.Url, end.Metadata))
 	}
 	p.mu.Unlock()
 	return serviceInstances

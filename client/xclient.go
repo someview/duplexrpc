@@ -85,7 +85,7 @@ func (c *xClient) selectClient(ctx context.Context) (RPCClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	url := instance.Endpoint
+	url := instance.Address()
 	end, ok := c.cachedClient.Get(url)
 	if !ok {
 		return nil, ErrorEndUnavailable
@@ -121,7 +121,7 @@ func (c *xClient) getCachedClient(k string, servicePath, serviceMethod string, a
 	return client, nil
 }
 
-func (x *xClient) updateTransport(instances []resolver.ServiceInstance) {
+func (x *xClient) updateTransport(instances []resolver.Node) {
 	num := len(instances)
 	if num == 0 {
 		x.mu.Lock()
@@ -133,7 +133,7 @@ func (x *xClient) updateTransport(instances []resolver.ServiceInstance) {
 	}
 	nowSet := util.NewSet[string]()
 	for _, ins := range instances {
-		nowSet.Insert(ins.Endpoint)
+		nowSet.Insert(ins.Address())
 	}
 	// 求出相同节点
 	added := nowSet.Difference(x.instaceSet)

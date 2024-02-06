@@ -6,15 +6,15 @@ import "context"
 //go:generate mockgen -source=registry.go -destination=../mocks/registry.go -package=mocks  Registrar
 type Registrar interface {
 	// Register the registration.
-	Register(ctx context.Context, service ServiceInstance) error
+	Register(ctx context.Context, service Node) error
 	// Deregister the registration.
-	Deregister(ctx context.Context, service ServiceInstance) error
+	Deregister(ctx context.Context, service Node) error
 }
 
 // Discovery is service discovery.
 type Discovery interface {
 	// GetService return the service instances in memory according to the service name.
-	GetService(ctx context.Context) ([]ServiceInstance, error)
+	GetService(ctx context.Context) ([]Node, error)
 	// Watch creates a watcher according to the service name.
 	Watch(ctx context.Context) (Watcher, error)
 }
@@ -25,9 +25,15 @@ type Watcher interface {
 	// 1.the first time to watch and the service instance list is not empty.
 	// 2.any service instance changes found.
 	// if the above two conditions are not met, it will block until context deadline exceeded or canceled
-	Next() ([]ServiceInstance, error)
+	Next() ([]Node, error)
 	// Stop close the watcher.
 	Stop() error
+}
+
+type Node interface {
+	Address() string
+	MD() map[string]string
+	Weight() *int
 }
 
 // ServiceInstance is an instance of a service in a discovery system.
@@ -39,9 +45,35 @@ type ServiceInstance struct {
 	//   http://127.0.0.1:8000?isSecure=false
 	//   grpc://127.0.0.1:9000?isSecure=false
 	Endpoint string `json:"endpoint"`
+
+	Wei *int
 }
 
-type ServiceListener func([]ServiceInstance)
+func NewNode(url string, readonlyMD map[string]string) Node {
+	return &ServiceInstance{
+		Endpoint: url,
+		Metadata: readonlyMD,
+	}
+}
+
+// Address implements Node.
+func (s *ServiceInstance) Address() string {
+	return s.Endpoint
+}
+
+// MD implements Node.
+func (s *ServiceInstance) MD() map[string]string {
+	return s.Metadata
+}
+
+// Weight implements Node.
+func (s *ServiceInstance) Weight() *int {
+	return s.Wei
+}
+
+var _ Node = (*ServiceInstance)(nil)
+
+type ServiceListener func([]Node)
 
 type Resolver interface {
 	/// <summary>
@@ -61,5 +93,6 @@ type Resolver interface {
 	/// </para>
 	/// </summary>
 	Refresh()
+	/// clear resource about this Resolver
 	Stop()
 }

@@ -7,6 +7,6 @@ import (
 )
 
 type Selector interface {
-	Apply([]resolver.ServiceInstance)
-	Select(ctx context.Context) (resolver.ServiceInstance, error)
+	Apply([]resolver.Node)
+	Select(ctx context.Context) (resolver.Node, error)
 }
