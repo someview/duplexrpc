@@ -35,6 +35,21 @@ type MuxClient struct {
 	ServerMessageChan chan<- protocol.Message
 }
 
+// Address implements RPCClient.
+func (*MuxClient) Address() string {
+	panic("unimplemented")
+}
+
+// IsShutdown implements RPCClient.
+func (*MuxClient) IsShutdown() bool {
+	panic("unimplemented")
+}
+
+// ServerMessageHandler implements RPCClient.
+func (*MuxClient) ServerMessageHandler() func(protocol.Message) {
+	panic("unimplemented")
+}
+
 func NewMuxClient() *MuxClient {
 	return &MuxClient{}
 }
