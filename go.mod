@@ -3,7 +3,6 @@ module rpc-oneway
 go 1.21.4
 
 require (
-	github.com/emirpasic/gods v1.18.1
 	github.com/golang/protobuf v1.5.2
 	github.com/json-iterator/go v1.1.12
 	github.com/panjf2000/ants/v2 v2.9.0
