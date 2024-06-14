@@ -1,5 +1,6 @@
-# rpc-oneway
-a rpc framework, sendmsg oneway, support both client send and server send 
+# TL.GoRpc
+
+为聊天系统oneway设计的rpc框架，通用属性和业务信息相分离，性能至少和grpc stream持平
 
 
 # 帧格式
@@ -34,10 +35,16 @@ a rpc framework, sendmsg oneway, support both client send and server send
 - data帧
 ```
 // msgType全局共享, 1个字节足够表达了256中消息
-[Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 length)][flag][optional][payload]
+[Frame Type (1 byte)] [msgType (1 bytes)] [msgLen (4 bytes)][flag(1 bytes)][optional][payload]
 ```
+trace: [flag = 0x1] [optional 24byte]
+seq: [flag = 0x2] [optional 4byte]
 
 - windowupdate
 ```
 [Frame Type (1 byte)] [Window Size Increase (4 bytes)]
 ```
+
+
+## 代码设计与实现
+// 参考grpc-go、kitex、netpoll、rpcx
