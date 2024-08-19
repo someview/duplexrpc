@@ -396,7 +396,7 @@ func (t *muxTransHandlerSuite) TestOnRead_Oneway() {
 	mockEndpoint.EXPECT().Reader().Return(lb)
 	mockEndpoint.EXPECT().SliceIntoReader(gomock.Any(), gomock.Any()).DoAndReturn(func(n int, buf *netpoll.LinkBuffer) error {
 		t.Equal(lb.Len(), n)
-		return lb.SliceIntoReader(n, buf)
+		return lb.SliceInto(n, buf)
 	})
 
 	t.invokeFunc = func(ctx context.Context, req, resp interface{}, info rpcinfo.RPCInfo) (err error) {
@@ -443,7 +443,7 @@ func (t *muxTransHandlerSuite) TestOnRead_Request() {
 	mockEndpoint.EXPECT().Reader().Return(lb)
 	mockEndpoint.EXPECT().SliceIntoReader(gomock.Any(), gomock.Any()).DoAndReturn(func(n int, buf *netpoll.LinkBuffer) error {
 		t.Equal(lb.Len(), n)
-		return lb.SliceIntoReader(n, buf)
+		return lb.SliceInto(n, buf)
 	})
 	mockEndpoint.EXPECT().Add(gomock.Any(), gomock.Any()).Times(1)
 
@@ -493,7 +493,7 @@ func (t *muxTransHandlerSuite) TestGracefulShutdown() {
 		mockEndpoint.EXPECT().Reader().Return(lb).AnyTimes()
 		mockEndpoint.EXPECT().SliceIntoReader(gomock.Any(), gomock.Any()).DoAndReturn(func(n int, buf *netpoll.LinkBuffer) error {
 			t.Equal(lb.Len(), n)
-			return lb.SliceIntoReader(n, buf)
+			return lb.SliceInto(n, buf)
 		}).AnyTimes()
 		err = t.muxTransHandler.OnRead(context.TODO(), mockEndpoint)
 		t.NoError(err)

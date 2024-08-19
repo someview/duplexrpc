@@ -13,10 +13,14 @@ var bufPool = pool.NewSyncPool[*netpoll.LinkBuffer](func() any {
 	return lb
 })
 
+type Sliceable interface {
+	SliceInto(n int, r netpoll.Reader) error
+}
+
 // SliceBuf 从Buf中Slice出一个Buf
-func SliceBuf(n int, slicer netpoll.Sliceable) (netpoll.Reader, error) {
+func SliceBuf(n int, slicer Sliceable) (netpoll.Reader, error) {
 	buf := bufPool.Get()
-	err := slicer.SliceIntoReader(n, buf)
+	err := slicer.SliceInto(n, buf)
 	if err != nil {
 		bufPool.Put(buf)
 		return nil, err

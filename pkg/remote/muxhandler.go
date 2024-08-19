@@ -126,7 +126,7 @@ func (t *muxTransHandler) OnRead(ctx context.Context, conn netpoll.Connection) e
 			t.handleProtocolError(ctx, end, err)
 			break
 		}
-		msgReader, err := util.SliceBuf(length, end)
+		msgReader, err := util.SliceBuf(length, end.(util.Sliceable))
 		if err != nil {
 			t.handleProtocolError(ctx, end, err)
 			break
