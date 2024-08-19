@@ -4,7 +4,7 @@ import (
 	netpoll "github.com/cloudwego/netpoll"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.gobase.git/dt/pool"
+	"github.com/someview/dt/pool"
 )
 
 var readerChanPool = pool.NewSyncPool[chan netpoll.Reader](func() any {

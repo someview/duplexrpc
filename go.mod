@@ -4,7 +4,7 @@ go 1.22
 
 toolchain go1.22.1
 
-require gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.gobase.git v1.0.6
+require github.com/someview/dt v0.0.4
 
 require (
 	github.com/cloudwego/netpoll v0.6.3

@@ -3,7 +3,7 @@ package remote
 import (
 	netpoll "github.com/cloudwego/netpoll"
 
-	"gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.gobase.git/dt/pool"
+	"github.com/someview/dt/pool"
 	"gitlab.dev.wiqun.com/tl/goserver/chat/l2/tl.gorpc.git/pkg/rpcinfo"
 	"gitlab.dev.wiqun.com/tl/goserver/chat/l2/tl.gorpc.git/pkg/service"
 	"gitlab.dev.wiqun.com/tl/goserver/chat/l2/tl.gorpc.git/util"

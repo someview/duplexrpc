@@ -63,9 +63,7 @@ endpoint + endpoint连接状态管理, 处理req,res到protocol.Message的转换
 
 #### Endpoint OnRequest
 ```
-Send(ctx,protocol.Message)error
-Recv(ctx)(protocol.Message,error)
-OnMessage(ctx CallContext, args, result protocol.Message) error
+
 ```
 
 #### TransHandler

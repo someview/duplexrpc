@@ -5,7 +5,7 @@ import (
 
 	netpoll "github.com/cloudwego/netpoll"
 
-	"gitlab.dev.wiqun.com/tl/goserver/chat/l1/tl.gobase.git/dt/pool"
+	"github.com/someview/dt/pool"
 )
 
 var bufPool = pool.NewSyncPool[*netpoll.LinkBuffer](func() any {
